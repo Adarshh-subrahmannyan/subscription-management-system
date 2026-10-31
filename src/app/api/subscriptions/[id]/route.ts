@@ -12,5 +12,5 @@ export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
   const subscription = await getSubscription(session.user.role, session.user.customerId, id);
   if (!subscription) return NextResponse.json({ error: "Subscription not found." }, { status: 404 });
-  return NextResponse.json(subscription);
+  return NextResponse.json({ data: subscription });
 }

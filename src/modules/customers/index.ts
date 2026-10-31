@@ -85,7 +85,11 @@ export async function getCustomer(
   return prisma.customer.findUnique({
     where: { id: customerId },
     include: {
-      subscriptions: { orderBy: { createdAt: "desc" }, take: 10 },
+      subscriptions: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: { plan: true },
+      },
       invoices: { orderBy: { createdAt: "desc" }, take: 10 },
     },
   });

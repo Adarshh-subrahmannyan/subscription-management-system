@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
+import { signOut, useSession } from "next-auth/react";
 import { getCurrentNavigation } from "./navigation";
 import { Icon } from "./icon";
 
@@ -20,9 +21,18 @@ export function Navbar({
   onToggleMobileMenu,
 }: NavbarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const currentNavigation = getCurrentNavigation(pathname);
   const menuRef = useRef<HTMLDivElement>(null);
+  const displayName = session?.user?.name || session?.user?.email || "Account";
+  const displayEmail = session?.user?.email || "";
+  const initials = displayName
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -115,10 +125,10 @@ export function Navbar({
             type="button"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-50 text-brand text-xs font-bold ring-2 ring-brand/20">
-              WS
+              {initials}
             </span>
             <span className="hidden text-sm font-semibold text-ink sm:block">
-              Workspace
+              {displayName}
             </span>
             <Icon
               className={`hidden h-4 w-4 text-ink-faint sm:block transition-transform duration-150 ${isAccountMenuOpen ? "rotate-90" : ""}`}
@@ -133,8 +143,11 @@ export function Navbar({
               role="menu"
             >
               <div className="px-3 py-2.5 border-b border-border mb-1">
-                <p className="text-xs font-semibold text-ink">Workspace</p>
-                <p className="text-[0.7rem] text-ink-muted mt-0.5">admin@workspace.com</p>
+                <p className="text-xs font-semibold text-ink">{displayName}</p>
+                <p className="text-[0.7rem] text-ink-muted mt-0.5">{displayEmail}</p>
+                <p className="mt-1 text-[0.65rem] font-semibold uppercase tracking-wide text-brand">
+                  {session?.user?.role || "guest"}
+                </p>
               </div>
               <Link
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-ink hover:bg-surface-muted transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
@@ -149,6 +162,7 @@ export function Navbar({
                 className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-brand hover:bg-brand-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
                 role="menuitem"
                 type="button"
+                onClick={() => void signOut({ callbackUrl: "/login" })}
               >
                 <Icon className="h-4 w-4" name="logout" />
                 Sign out

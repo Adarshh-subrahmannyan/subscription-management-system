@@ -1,172 +1,203 @@
+import { getServerSession } from "next-auth";
+import Link from "next/link";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Icon } from "@/components/layout/icon";
 
-// ── Placeholder data – replace with API responses ────────────────────────────
-const MOCK_SUBSCRIPTIONS = [
-  {
-    id: "sub-1",
-    serviceName: "YouTube Music",
-    logoInitials: "YM",
-    logoBg: "bg-red-500",
-    plan: "Family Plan",
-    amount: "$13.99",
-    interval: "/month",
-    status: "active",
-    nextBilling: "Nov 12, 2026",
-  },
-  {
-    id: "sub-2",
-    serviceName: "HBO Max",
-    logoInitials: "HBO",
-    logoBg: "bg-blue-600",
-    plan: "Standard",
-    amount: "$15.99",
-    interval: "/month",
-    status: "active",
-    nextBilling: "Nov 18, 2026",
-  },
-];
+function formatCurrency(cents: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
 
-const MOCK_INVOICES = [
-  { id: "inv-001", label: "INV-0041", amount: "$13.99", dueDate: "Nov 5, 2026",  status: "unpaid" },
-  { id: "inv-002", label: "INV-0040", amount: "$15.99", dueDate: "Nov 5, 2026",  status: "unpaid" },
-  { id: "inv-003", label: "INV-0039", amount: "$13.99", dueDate: "Oct 12, 2026", status: "paid"   },
-];
+function formatDate(date: Date | null) {
+  if (!date) return "—";
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
-export default function PortalDashboardPage() {
+export default async function PortalDashboardPage() {
+  const session = await getServerSession(authOptions);
+  let customerId = session?.user?.customerId;
+
+  if (!customerId) {
+    const firstCust = await prisma.customer.findFirst({ where: { active: true } });
+    customerId = firstCust?.id;
+  }
+
+  const [customer, subscriptions, invoices, featuredPlan] = await Promise.all([
+    customerId ? prisma.customer.findUnique({ where: { id: customerId } }) : null,
+    customerId
+      ? prisma.subscription.findMany({
+          where: { customerId },
+          include: { plan: true },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        })
+      : [],
+    customerId
+      ? prisma.invoice.findMany({
+          where: { customerId },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        })
+      : [],
+    prisma.plan.findFirst({ where: { active: true }, orderBy: { price: "desc" } }),
+  ]);
+
+  const customerName = customer?.name ?? session?.user?.name ?? "Customer";
+
   return (
     <section>
       {/* Greeting header */}
       <div className="mb-6">
-        <p className="text-xs text-ink-muted font-medium">Good afternoon,</p>
-        <h1 className="text-xl font-bold text-ink mt-0.5">Jane Doe</h1>
+        <p className="text-xs text-ink-muted font-medium">Customer Portal</p>
+        <h1 className="text-xl font-bold text-ink mt-0.5">{customerName}</h1>
       </div>
 
-      {/* Offer of the week – from mobile design spec */}
-      <div className="mb-6">
-        <div className="flex items-baseline justify-between mb-3">
-          <div>
-            <p className="text-xs text-ink-muted font-medium">Offer Of</p>
-            <p className="text-base font-bold text-ink leading-tight">The Week</p>
-          </div>
-          <button
-            type="button"
-            aria-label="See all offers"
-            className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-blue/10 text-accent-blue hover:bg-accent-blue hover:text-white transition-colors"
-          >
-            <Icon name="arrow-right" className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Offer card */}
-        <div className="card flex overflow-hidden">
-          {/* Red strip */}
-          <div className="w-[5.5rem] shrink-0 bg-brand flex flex-col items-center justify-center py-5 gap-3">
-            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center">
-              <span className="text-xs font-bold text-brand">N</span>
-            </div>
-            <span className="text-[0.6rem] text-white/80 text-center leading-tight px-2">
-              Expires Nov 30
-            </span>
-          </div>
-          {/* Content */}
-          <div className="flex flex-1 items-center justify-between px-4 py-4 gap-3">
+      {/* Featured Plan Card */}
+      {featuredPlan && (
+        <div className="mb-6">
+          <div className="flex items-baseline justify-between mb-3">
             <div>
-              <p className="text-sm font-bold text-ink">Netflix</p>
-              <p className="text-xs text-ink-muted mt-0.5">Family Pack</p>
-              <p className="mt-2 text-lg font-bold text-ink tabular">$9.00</p>
-              <p className="text-xs text-ink-muted">Per Month</p>
+              <p className="text-xs text-ink-muted font-medium">Recommended</p>
+              <p className="text-base font-bold text-ink leading-tight">Featured Plan</p>
             </div>
-            <button
-              type="button"
-              aria-label="Add Netflix Family Pack subscription"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-brand hover:bg-brand-600 transition-colors"
+            <Link
+              href="/portal/subscriptions"
+              aria-label="See all subscriptions"
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-blue/10 text-accent-blue hover:bg-accent-blue hover:text-white transition-colors"
             >
-              <Icon name="plus" className="h-5 w-5" />
-            </button>
+              <Icon name="arrow-right" className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="card flex overflow-hidden">
+            <div className="w-[5.5rem] shrink-0 bg-brand flex flex-col items-center justify-center py-5 gap-3">
+              <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center">
+                <span className="text-xs font-bold text-brand">P</span>
+              </div>
+              <span className="text-[0.6rem] text-white/80 text-center leading-tight px-2">
+                Special Rate
+              </span>
+            </div>
+            <div className="flex flex-1 items-center justify-between px-4 py-4 gap-3">
+              <div>
+                <p className="text-sm font-bold text-ink">{featuredPlan.name}</p>
+                <p className="text-xs text-ink-muted mt-0.5 line-clamp-1">
+                  {featuredPlan.description ?? "Complete subscription suite"}
+                </p>
+                <p className="mt-2 text-lg font-bold text-ink tabular">{formatCurrency(featuredPlan.price)}</p>
+                <p className="text-xs text-ink-muted capitalize">Per {featuredPlan.billingFrequency}</p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Active subscriptions */}
       <div className="mb-6">
         <div className="flex items-baseline justify-between mb-3">
           <div>
-            <p className="text-xs text-ink-muted font-medium">Recent</p>
-            <p className="text-base font-bold text-ink leading-tight">Subscriptions</p>
+            <p className="text-xs text-ink-muted font-medium">Your</p>
+            <p className="text-base font-bold text-ink leading-tight">Active Subscriptions</p>
           </div>
-          <a
+          <Link
             href="/portal/subscriptions"
             aria-label="See all subscriptions"
             className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-blue/10 text-accent-blue hover:bg-accent-blue hover:text-white transition-colors"
           >
             <Icon name="arrow-right" className="h-4 w-4" />
-          </a>
+          </Link>
         </div>
 
-        <div className="space-y-3">
-          {MOCK_SUBSCRIPTIONS.map((sub) => (
-            <a
-              key={sub.id}
-              href={`/portal/subscriptions`}
-              className="card flex items-center gap-4 p-4 hover:shadow-card-md hover:border-brand/20 transition-all group"
-            >
-              <div className={`h-11 w-11 shrink-0 rounded-2xl ${sub.logoBg} flex items-center justify-center text-white text-xs font-bold`}>
-                {sub.logoInitials}
+        {subscriptions.length === 0 ? (
+          <div className="card p-6 text-center text-sm text-ink-muted">
+            You do not have any active subscriptions.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {subscriptions.map((sub) => (
+              <div
+                key={sub.id}
+                className="card flex items-center gap-4 p-4 hover:shadow-card-md transition-all"
+              >
+                <div className="h-11 w-11 shrink-0 rounded-2xl bg-brand-50 text-brand flex items-center justify-center text-xs font-bold ring-2 ring-brand/10">
+                  <Icon name="repeat" className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-ink truncate">{sub.plan.name}</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    Next billing: <span className="font-medium">{formatDate(sub.nextBillingDate)}</span>
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-ink tabular">{formatCurrency(sub.plan.price)}</p>
+                  <p className="text-xs text-ink-muted capitalize">/{sub.plan.billingFrequency}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-ink truncate">{sub.serviceName}</p>
-                <p className="text-xs text-ink-muted mt-0.5">
-                  Next billing: <span className="font-medium">{sub.nextBilling}</span>
-                </p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-ink tabular">{sub.amount}</p>
-                <p className="text-xs text-ink-muted">{sub.interval}</p>
-              </div>
-            </a>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Unpaid invoices */}
+      {/* Invoices */}
       <div>
         <div className="flex items-baseline justify-between mb-3">
           <div>
-            <p className="text-xs text-ink-muted font-medium">Pending</p>
-            <p className="text-base font-bold text-ink leading-tight">Invoices</p>
+            <p className="text-xs text-ink-muted font-medium">Billing &</p>
+            <p className="text-base font-bold text-ink leading-tight">Recent Invoices</p>
           </div>
-          <a
+          <Link
             href="/portal/invoices"
             aria-label="See all invoices"
             className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-blue/10 text-accent-blue hover:bg-accent-blue hover:text-white transition-colors"
           >
             <Icon name="arrow-right" className="h-4 w-4" />
-          </a>
+          </Link>
         </div>
 
-        <div className="space-y-2">
-          {MOCK_INVOICES.map((inv) => (
-            <a
-              key={inv.id}
-              href="/portal/invoices"
-              className="card flex items-center gap-4 p-4 hover:shadow-card-md transition-all"
-            >
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${inv.status === "paid" ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"}`}>
-                <Icon name="receipt" className="h-4 w-4" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-ink">{inv.label}</p>
-                <p className="text-xs text-ink-muted mt-0.5">Due: {inv.dueDate}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-ink tabular">{inv.amount}</p>
-                <span className={`text-[0.65rem] font-semibold ${inv.status === "paid" ? "text-green-600" : "text-amber-600"}`}>
-                  {inv.status === "paid" ? "Paid" : "Unpaid"}
+        {invoices.length === 0 ? (
+          <div className="card p-6 text-center text-sm text-ink-muted">
+            No invoices generated yet.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {invoices.map((inv) => (
+              <div
+                key={inv.id}
+                className="card flex items-center gap-4 p-4 hover:shadow-card-md transition-all"
+              >
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
+                    inv.status === "paid" ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"
+                  }`}
+                >
+                  <Icon name="receipt" className="h-4 w-4" />
                 </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-ink font-mono">{inv.number}</p>
+                  <p className="text-xs text-ink-muted mt-0.5">Due: {formatDate(inv.dueAt)}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-ink tabular">{formatCurrency(inv.total)}</p>
+                  <span
+                    className={`text-[0.65rem] font-semibold uppercase tracking-wider ${
+                      inv.status === "paid" ? "text-green-600" : "text-amber-600"
+                    }`}
+                  >
+                    {inv.status}
+                  </span>
+                </div>
               </div>
-            </a>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

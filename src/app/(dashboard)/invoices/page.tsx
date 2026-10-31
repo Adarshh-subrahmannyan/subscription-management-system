@@ -1,15 +1,42 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Icon } from "@/components/layout/icon";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingState } from "@/components/shared/loading-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { apiRequest, formatCurrency, formatDate } from "@/lib/client-api";
 
-const MOCK_INVOICES = [
-  { id: "inv-1", number: "INV-0041", customer: "Acme Corp",     date: "Oct 31, 2026", due: "Nov 7, 2026",  total: "₹60,000", paid: "₹0",      status: "confirmed" },
-  { id: "inv-2", number: "INV-0040", customer: "TechStart Ltd", date: "Oct 15, 2026", due: "Oct 22, 2026", total: "₹5,000",  paid: "₹5,000",  status: "paid"      },
-  { id: "inv-3", number: "INV-0039", customer: "GreenLeaf Inc", date: "Oct 1, 2026",  due: "Oct 8, 2026",  total: "₹2,500",  paid: "₹0",      status: "overdue"   },
-];
+type Invoice = {
+  id: string;
+  number: string;
+  status: string;
+  createdAt: string;
+  dueAt: string | null;
+  total: number;
+  customer: { name: string };
+};
 
 export default function InvoicesPage() {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiRequest<Invoice[]>("/api/invoices")
+      .then(setInvoices)
+      .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load invoices."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredInvoices = useMemo(
+    () => invoices.filter((invoice) => `${invoice.number} ${invoice.customer.name}`.toLowerCase().includes(search.toLowerCase())),
+    [invoices, search],
+  );
+
   return (
     <section>
       <PageHeader
@@ -20,14 +47,23 @@ export default function InvoicesPage() {
       <div className="mb-4 flex gap-3">
         <div className="relative flex-1 max-w-sm">
           <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-faint pointer-events-none" />
-          <input type="search" placeholder="Search invoices…" aria-label="Search invoices"
+          <input type="search" placeholder="Search invoices…" aria-label="Search invoices" value={search} onChange={(event) => setSearch(event.target.value)}
             className="w-full rounded-xl border border-border bg-surface py-2.5 pl-10 pr-4 text-sm text-ink placeholder-ink-faint outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors"
           />
         </div>
       </div>
 
-      {MOCK_INVOICES.length === 0 ? (
-        <EmptyState title="No invoices" description="Invoices will appear here once subscriptions are active." icon="receipt" />
+      {loading ? <LoadingState columns={6} /> : error ? (
+        <ErrorState message={error} onRetry={() => {
+          setLoading(true);
+          setError(null);
+          apiRequest<Invoice[]>("/api/invoices")
+            .then(setInvoices)
+            .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load invoices."))
+            .finally(() => setLoading(false));
+        }} />
+      ) : filteredInvoices.length === 0 ? (
+        <EmptyState title="No invoices" description={search ? "No invoices match your search." : "Invoices will appear here once subscriptions are active."} icon="receipt" />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
           <div className="overflow-x-auto">
@@ -42,15 +78,15 @@ export default function InvoicesPage() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_INVOICES.map((inv) => (
+                {filteredInvoices.map((inv) => (
                   <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-surface-muted/60 transition-colors group">
                     <td className="px-5 py-4 font-mono text-xs text-ink-muted">{inv.number}</td>
                     <td className="px-5 py-4">
-                      <a href={`/invoices/${inv.id}`} className="font-semibold text-ink hover:text-brand transition-colors">{inv.customer}</a>
+                      <a href={`/invoices/${inv.id}`} className="font-semibold text-ink hover:text-brand transition-colors">{inv.customer.name}</a>
                     </td>
-                    <td className="px-5 py-4 text-ink-muted">{inv.date}</td>
-                    <td className="px-5 py-4 text-ink-muted">{inv.due}</td>
-                    <td className="px-5 py-4 font-semibold text-ink tabular">{inv.total}</td>
+                    <td className="px-5 py-4 text-ink-muted">{formatDate(inv.createdAt)}</td>
+                    <td className="px-5 py-4 text-ink-muted">{formatDate(inv.dueAt)}</td>
+                    <td className="px-5 py-4 font-semibold text-ink tabular">{formatCurrency(inv.total)}</td>
                     <td className="px-5 py-4"><StatusBadge status={inv.status} /></td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -1,60 +1,22 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/layout/icon";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { ErrorState } from "@/components/shared/error-state";
+import { CardLoadingState } from "@/components/shared/loading-state";
+import { apiRequest, formatCurrency } from "@/lib/client-api";
 
-// ── Placeholder KPI data ─────────────────────────────────────────────────────
-// These are illustrative mock values. Replace with real API responses once the
-// reporting endpoint is available. Do not treat these as live metrics.
-const KPI_CARDS = [
-  {
-    id: "active-subscriptions",
-    title: "Active subscriptions",
-    value: "—",
-    detail: "Awaiting reporting API",
-    variant: "brand" as const,
-    icon: <Icon name="repeat" className="h-5 w-5" />,
-  },
-  {
-    id: "revenue-received",
-    title: "Revenue received",
-    value: "—",
-    detail: "Payments collected, not merely invoiced",
-    variant: "success" as const,
-    icon: <Icon name="card" className="h-5 w-5" />,
-  },
-  {
-    id: "outstanding-amount",
-    title: "Outstanding amount",
-    value: "—",
-    detail: "Unpaid invoice balance",
-    variant: "warning" as const,
-    icon: <Icon name="receipt" className="h-5 w-5" />,
-  },
-  {
-    id: "overdue-invoices",
-    title: "Overdue invoices",
-    value: "—",
-    detail: "Past due date and not fully paid",
-    variant: "danger" as const,
-    icon: <Icon name="alert" className="h-5 w-5" />,
-  },
-  {
-    id: "total-customers",
-    title: "Total customers",
-    value: "—",
-    detail: "All registered customer accounts",
-    variant: "default" as const,
-    icon: <Icon name="users" className="h-5 w-5" />,
-  },
-  {
-    id: "total-subscriptions",
-    title: "Total subscriptions",
-    value: "—",
-    detail: "All-time subscription count",
-    variant: "default" as const,
-    icon: <Icon name="layers" className="h-5 w-5" />,
-  },
-] as const;
+type Analytics = {
+  activeSubscriptionCount: number;
+  subscriptionCount: number;
+  customerCount: number;
+  overdueInvoiceCount: number;
+  totalPaid: number;
+  outstandingAmount: number;
+  subscriptionsByStatus: { status: string; count: number }[];
+};
 
 // ── Recent activity placeholder rows ────────────────────────────────────────
 const ACTIVITY_ROWS = [
@@ -64,20 +26,43 @@ const ACTIVITY_ROWS = [
 ];
 
 export default function DashboardPage() {
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiRequest<Analytics>("/api/analytics")
+      .then(setAnalytics)
+      .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load dashboard analytics."));
+  }, []);
+
+  const cards = analytics ? [
+    { id: "active-subscriptions", title: "Active subscriptions", value: String(analytics.activeSubscriptionCount), detail: "Currently active", variant: "brand" as const, icon: <Icon name="repeat" className="h-5 w-5" /> },
+    { id: "revenue-received", title: "Revenue received", value: formatCurrency(analytics.totalPaid), detail: "Payments collected", variant: "success" as const, icon: <Icon name="card" className="h-5 w-5" /> },
+    { id: "outstanding-amount", title: "Outstanding amount", value: formatCurrency(analytics.outstandingAmount), detail: "Unpaid invoice balance", variant: "warning" as const, icon: <Icon name="receipt" className="h-5 w-5" /> },
+    { id: "overdue-invoices", title: "Overdue invoices", value: String(analytics.overdueInvoiceCount), detail: "Past due and not fully paid", variant: "danger" as const, icon: <Icon name="alert" className="h-5 w-5" /> },
+    { id: "total-customers", title: "Total customers", value: String(analytics.customerCount), detail: "Registered customer accounts", variant: "default" as const, icon: <Icon name="users" className="h-5 w-5" /> },
+    { id: "total-subscriptions", title: "Total subscriptions", value: String(analytics.subscriptionCount), detail: "All subscription statuses", variant: "default" as const, icon: <Icon name="layers" className="h-5 w-5" /> },
+  ] : [];
+
   return (
     <section>
       <PageHeader
         title="Dashboard"
         description="Your subscription business at a glance."
-        badge="Live"
+        badge={analytics ? "Live" : "Loading"}
       />
 
       {/* KPI grid */}
-      <div
+      {error ? <ErrorState message={error} onRetry={() => {
+        setError(null);
+        apiRequest<Analytics>("/api/analytics")
+          .then(setAnalytics)
+          .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load dashboard analytics."));
+      }} /> : !analytics ? <CardLoadingState cards={6} /> : <div
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
         aria-label="Key performance indicators"
       >
-        {KPI_CARDS.map((card) => (
+        {cards.map((card) => (
           <StatCard
             key={card.id}
             title={card.title}
@@ -87,7 +72,7 @@ export default function DashboardPage() {
             icon={card.icon}
           />
         ))}
-      </div>
+      </div>}
 
       {/* Charts + activity — pending API */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -108,10 +93,10 @@ export default function DashboardPage() {
                 <Icon name="chart" className="h-6 w-6" />
               </span>
               <p className="mt-4 text-sm font-semibold text-ink-muted">
-                Revenue chart not yet connected
+                Revenue history is not available yet
               </p>
               <p className="mt-1 text-xs text-ink-faint max-w-xs">
-                Will render once the reporting API is available. No fabricated data is displayed.
+                Live totals above come from billing records. No fabricated history is displayed.
               </p>
             </div>
           </div>
@@ -133,7 +118,14 @@ export default function DashboardPage() {
               <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-card text-ink-faint">
                 <Icon name="repeat" className="h-5 w-5" />
               </span>
-              <p className="mt-3 text-sm font-semibold text-ink-muted">Awaiting data</p>
+              {analytics ? (
+                <ul className="mt-3 space-y-2 text-sm text-ink-muted">
+                  {analytics.subscriptionsByStatus.map(({ status, count }) => (
+                    <li key={status} className="flex justify-between gap-6"><span className="capitalize">{status}</span><strong className="text-ink">{count}</strong></li>
+                  ))}
+                  {analytics.subscriptionsByStatus.length === 0 && <li>No subscriptions recorded</li>}
+                </ul>
+              ) : <p className="mt-3 text-sm font-semibold text-ink-muted">{error ? "Analytics unavailable" : "Loading data…"}</p>}
             </div>
           </div>
         </div>

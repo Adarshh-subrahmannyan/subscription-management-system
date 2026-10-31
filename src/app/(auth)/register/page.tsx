@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/layout/icon";
+import { apiRequest } from "@/lib/client-api";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,10 +39,17 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      // TODO: Replace with real registration API call.
-      await new Promise((r) => setTimeout(r, 1000));
-    } catch {
-      setError("Registration failed. Please try again.");
+      await apiRequest("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          password: form.password,
+        }),
+      });
+      router.replace("/login?registered=1");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Registration failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

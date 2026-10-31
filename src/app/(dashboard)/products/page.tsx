@@ -1,40 +1,41 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Icon } from "@/components/layout/icon";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingState } from "@/components/shared/loading-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { apiRequest, formatCurrency } from "@/lib/client-api";
 
-// Placeholder — replace with API data
-const MOCK_PRODUCTS = [
-  {
-    id: "prod-1",
-    name: "Enterprise Suite",
-    type: "Software",
-    salesPrice: "₹12,000",
-    costPrice: "₹4,000",
-    variants: 3,
-    status: "active",
-  },
-  {
-    id: "prod-2",
-    name: "Starter Pack",
-    type: "Software",
-    salesPrice: "₹2,500",
-    costPrice: "₹800",
-    variants: 1,
-    status: "active",
-  },
-  {
-    id: "prod-3",
-    name: "Legacy Module",
-    type: "Add-on",
-    salesPrice: "₹500",
-    costPrice: "₹120",
-    variants: 0,
-    status: "draft",
-  },
-];
+type Product = {
+  id: string;
+  name: string;
+  type: string;
+  salesPrice: number;
+  variants: { id: string }[];
+  active: boolean;
+};
 
 export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiRequest<Product[]>("/api/products")
+      .then(setProducts)
+      .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load products."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredProducts = useMemo(
+    () => products.filter((product) => product.name.toLowerCase().includes(search.toLowerCase())),
+    [products, search],
+  );
+
   return (
     <section>
       <PageHeader
@@ -59,6 +60,8 @@ export default function ProductsPage() {
             type="search"
             placeholder="Search products…"
             aria-label="Search products"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
             className="w-full rounded-xl border border-border bg-surface py-2.5 pl-10 pr-4 text-sm text-ink placeholder-ink-faint outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors"
           />
         </div>
@@ -72,10 +75,19 @@ export default function ProductsPage() {
       </div>
 
       {/* Table */}
-      {MOCK_PRODUCTS.length === 0 ? (
+      {loading ? <LoadingState columns={5} /> : error ? (
+        <ErrorState message={error} onRetry={() => {
+          setLoading(true);
+          setError(null);
+          apiRequest<Product[]>("/api/products")
+            .then(setProducts)
+            .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load products."))
+            .finally(() => setLoading(false));
+        }} />
+      ) : filteredProducts.length === 0 ? (
         <EmptyState
-          title="No products yet"
-          description="Add your first product to start building subscription plans."
+          title={search ? "No matching products" : "No products yet"}
+          description={search ? "Try a different search." : "Add your first product to start building subscription plans."}
           icon="package"
           action={
             <a
@@ -105,7 +117,7 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_PRODUCTS.map((product) => (
+                {filteredProducts.map((product) => (
                   <tr
                     key={product.id}
                     className="border-b border-border last:border-0 hover:bg-surface-muted/60 transition-colors group"
@@ -124,14 +136,14 @@ export default function ProductsPage() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-ink-muted">{product.type}</td>
-                    <td className="px-5 py-4 font-semibold text-ink tabular">{product.salesPrice}</td>
+                    <td className="px-5 py-4 font-semibold text-ink tabular">{formatCurrency(product.salesPrice)}</td>
                     <td className="px-5 py-4 text-ink-muted">
-                      {product.variants === 0
+                      {product.variants.length === 0
                         ? <span className="text-ink-faint">—</span>
-                        : `${product.variants} variant${product.variants !== 1 ? "s" : ""}`}
+                        : `${product.variants.length} variant${product.variants.length !== 1 ? "s" : ""}`}
                     </td>
                     <td className="px-5 py-4">
-                      <StatusBadge status={product.status} />
+                      <StatusBadge status={product.active ? "active" : "inactive"} />
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -159,7 +171,7 @@ export default function ProductsPage() {
           {/* Pagination */}
           <div className="flex items-center justify-between border-t border-border px-5 py-3.5 bg-surface-muted/40">
             <p className="text-xs text-ink-muted">
-              Showing <span className="font-semibold text-ink">3</span> of <span className="font-semibold text-ink">3</span> products
+              Showing <span className="font-semibold text-ink">{filteredProducts.length}</span> products
             </p>
             <div className="flex items-center gap-1">
               <button type="button" disabled className="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-surface text-ink-faint disabled:opacity-50 disabled:cursor-not-allowed">

@@ -1,59 +1,46 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Icon } from "@/components/layout/icon";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingState } from "@/components/shared/loading-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { apiRequest, formatCurrency, formatDate } from "@/lib/client-api";
 
-// Placeholder — replace with API data
-const MOCK_SUBSCRIPTIONS = [
-  {
-    id: "sub-001",
-    number: "SUB-0001",
-    customer: "Acme Corp",
-    plan: "Enterprise Suite / Monthly",
-    quantity: 5,
-    startDate: "Oct 1, 2026",
-    nextBilling: "Nov 1, 2026",
-    status: "active",
-    amount: "₹60,000",
-  },
-  {
-    id: "sub-002",
-    number: "SUB-0002",
-    customer: "TechStart Ltd",
-    plan: "Starter Pack / Monthly",
-    quantity: 2,
-    startDate: "Oct 15, 2026",
-    nextBilling: "Nov 15, 2026",
-    status: "active",
-    amount: "₹5,000",
-  },
-  {
-    id: "sub-003",
-    number: "SUB-0003",
-    customer: "GreenLeaf Inc",
-    plan: "Starter Pack / Yearly",
-    quantity: 1,
-    startDate: "Sep 1, 2026",
-    nextBilling: "Sep 1, 2027",
-    status: "pending",
-    amount: "₹2,500",
-  },
-  {
-    id: "sub-004",
-    number: "SUB-0004",
-    customer: "Horizon Media",
-    plan: "Enterprise Suite / Monthly",
-    quantity: 10,
-    startDate: "Aug 1, 2026",
-    nextBilling: "—",
-    status: "closed",
-    amount: "₹1,20,000",
-  },
-];
+type Subscription = {
+  id: string;
+  number: string;
+  status: string;
+  nextBillingDate: string | null;
+  customer: { name: string };
+  plan: { name: string; price: number; billingFrequency: string };
+  lines: { quantity: number }[];
+};
 
 const STATUS_FILTERS = ["All", "Active", "Pending", "Closed", "Draft"] as const;
 
 export default function SubscriptionsPage() {
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiRequest<Subscription[]>("/api/subscriptions?page=1")
+      .then(setSubscriptions)
+      .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load subscriptions."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredSubscriptions = useMemo(() => subscriptions.filter((sub) => {
+    const matchesSearch = `${sub.number} ${sub.customer.name} ${sub.plan.name}`.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "All" || sub.status.toLowerCase() === statusFilter.toLowerCase();
+    return matchesSearch && matchesStatus;
+  }), [subscriptions, search, statusFilter]);
+
   return (
     <section>
       <PageHeader
@@ -78,16 +65,19 @@ export default function SubscriptionsPage() {
             type="search"
             placeholder="Search subscriptions…"
             aria-label="Search subscriptions"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
             className="w-full rounded-xl border border-border bg-surface py-2.5 pl-10 pr-4 text-sm text-ink placeholder-ink-faint outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors"
           />
         </div>
         {/* Quick status tabs */}
         <div className="flex gap-1.5 flex-wrap">
-          {STATUS_FILTERS.map((f, i) => (
+          {STATUS_FILTERS.map((f) => (
             <button
               key={f}
               type="button"
-              className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors ${i === 0 ? "bg-brand text-white shadow-brand" : "border border-border bg-surface text-ink-muted hover:bg-surface-muted hover:text-ink"}`}
+              onClick={() => setStatusFilter(f)}
+              className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors ${statusFilter === f ? "bg-brand text-white shadow-brand" : "border border-border bg-surface text-ink-muted hover:bg-surface-muted hover:text-ink"}`}
             >
               {f}
             </button>
@@ -95,10 +85,19 @@ export default function SubscriptionsPage() {
         </div>
       </div>
 
-      {MOCK_SUBSCRIPTIONS.length === 0 ? (
+      {loading ? <LoadingState columns={7} /> : error ? (
+        <ErrorState message={error} onRetry={() => {
+          setLoading(true);
+          setError(null);
+          apiRequest<Subscription[]>("/api/subscriptions?page=1")
+            .then(setSubscriptions)
+            .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load subscriptions."))
+            .finally(() => setLoading(false));
+        }} />
+      ) : filteredSubscriptions.length === 0 ? (
         <EmptyState
-          title="No subscriptions yet"
-          description="Create your first subscription to get started."
+          title={subscriptions.length ? "No matching subscriptions" : "No subscriptions yet"}
+          description={subscriptions.length ? "Adjust your search or status filter." : "Create your first subscription to get started."}
           icon="repeat"
           action={
             <a
@@ -128,7 +127,7 @@ export default function SubscriptionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_SUBSCRIPTIONS.map((sub) => (
+                {filteredSubscriptions.map((sub) => (
                   <tr
                     key={sub.id}
                     className="border-b border-border last:border-0 hover:bg-surface-muted/60 transition-colors group"
@@ -137,20 +136,20 @@ export default function SubscriptionsPage() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand text-xs font-bold">
-                          {sub.customer.charAt(0)}
+                          {sub.customer.name.charAt(0)}
                         </span>
                         <a
                           href={`/subscriptions/${sub.id}`}
                           className="font-semibold text-ink hover:text-brand transition-colors"
                         >
-                          {sub.customer}
+                          {sub.customer.name}
                         </a>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-ink-muted max-w-[200px] truncate">{sub.plan}</td>
-                    <td className="px-5 py-4 tabular text-ink-muted">{sub.quantity}</td>
-                    <td className="px-5 py-4 tabular text-ink-muted">{sub.nextBilling}</td>
-                    <td className="px-5 py-4 font-semibold text-ink tabular">{sub.amount}</td>
+                    <td className="px-5 py-4 text-ink-muted max-w-[200px] truncate">{sub.plan.name} / {sub.plan.billingFrequency}</td>
+                    <td className="px-5 py-4 tabular text-ink-muted">{sub.lines.reduce((sum, line) => sum + line.quantity, 0)}</td>
+                    <td className="px-5 py-4 tabular text-ink-muted">{formatDate(sub.nextBillingDate)}</td>
+                    <td className="px-5 py-4 font-semibold text-ink tabular">{formatCurrency(sub.plan.price)}</td>
                     <td className="px-5 py-4">
                       <StatusBadge status={sub.status} />
                     </td>
@@ -172,7 +171,7 @@ export default function SubscriptionsPage() {
           </div>
           <div className="flex items-center justify-between border-t border-border px-5 py-3.5 bg-surface-muted/40">
             <p className="text-xs text-ink-muted">
-              Showing <span className="font-semibold text-ink">4</span> of <span className="font-semibold text-ink">4</span> subscriptions
+              Showing <span className="font-semibold text-ink">{filteredSubscriptions.length}</span> of <span className="font-semibold text-ink">{subscriptions.length}</span> subscriptions
             </p>
             <div className="flex items-center gap-1">
               <button type="button" disabled className="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-surface text-ink-faint disabled:opacity-50 disabled:cursor-not-allowed">

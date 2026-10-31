@@ -16,6 +16,77 @@ function assertCanManage(role: Role) {
   }
 }
 
+export type CreateSubscriptionInput = {
+  customerId: string;
+  planId: string;
+  startDate: string;
+  paymentTerms?: string | null;
+  lines?: Array<{ productId: string; quantity: number }>;
+};
+
+export async function createSubscription(role: Role, input: CreateSubscriptionInput) {
+  assertCanManage(role);
+  if (!input.customerId?.trim() || !input.planId?.trim()) {
+    throw new Error("Customer and plan are required.");
+  }
+  const startDate = validateSubscriptionStartDate(input.startDate);
+  const [customer, plan] = await Promise.all([
+    prisma.customer.findUnique({ where: { id: input.customerId } }),
+    prisma.plan.findUnique({
+      where: { id: input.planId },
+      include: { items: { include: { product: true } } },
+    }),
+  ]);
+  if (!customer) throw new Error("Customer not found.");
+  if (!plan || !plan.active) throw new Error("An active plan is required.");
+  if (plan.availabilityStart && startDate < plan.availabilityStart) {
+    throw new Error("The plan is not available on the selected start date.");
+  }
+  if (plan.availabilityEnd && startDate > plan.availabilityEnd) {
+    throw new Error("The plan is no longer available on the selected start date.");
+  }
+
+  const requestedLines = input.lines?.length
+    ? input.lines
+    : plan.items.map((item) => ({ productId: item.productId, quantity: item.quantity }));
+  if (!requestedLines.length) throw new Error("The selected plan has no products.");
+  if (new Set(requestedLines.map((line) => line.productId)).size !== requestedLines.length) {
+    throw new Error("Each product can only be included once.");
+  }
+  const availableItems = new Map(plan.items.map((item) => [item.productId, item]));
+  const quantityTotal = requestedLines.reduce((sum, line) => sum + line.quantity, 0);
+  if (!Number.isSafeInteger(quantityTotal) || quantityTotal < plan.minimumQuantity) {
+    throw new Error(`The plan requires a minimum quantity of ${plan.minimumQuantity}.`);
+  }
+  const lines = requestedLines.map((line) => {
+    const item = availableItems.get(line.productId);
+    if (!item || !item.product.active) {
+      throw new Error("Every selected product must be active and included in the plan.");
+    }
+    if (!Number.isSafeInteger(line.quantity) || line.quantity < 1) {
+      throw new Error("Product quantities must be positive integers.");
+    }
+    const unitPrice = item.product.salesPrice;
+    const amount = unitPrice * line.quantity;
+    if (!Number.isSafeInteger(amount)) throw new Error("Subscription amount is too large.");
+    return { productId: item.productId, quantity: line.quantity, unitPrice, taxAmount: 0, amount };
+  });
+
+  return prisma.subscription.create({
+    data: {
+      number: subscriptionNumber(),
+      customerId: customer.id,
+      planId: plan.id,
+      status: "draft",
+      startDate,
+      nextBillingDate: startDate,
+      paymentTerms: input.paymentTerms?.trim() || null,
+      lines: { create: lines },
+    },
+    include: { lines: true, customer: true, plan: true },
+  });
+}
+
 export async function convertQuotationToSubscription(
   role: Role,
   quotationId: string,

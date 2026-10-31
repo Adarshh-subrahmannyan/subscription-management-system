@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Icon } from "@/components/layout/icon";
+import { apiRequest } from "@/lib/client-api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -18,11 +19,13 @@ export default function ForgotPasswordPage() {
 
     setIsSubmitting(true);
     try {
-      // TODO: Replace with real password-reset API call.
-      await new Promise((r) => setTimeout(r, 1000));
+      await apiRequest("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim() }),
+      });
       setSent(true);
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

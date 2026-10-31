@@ -1,15 +1,44 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Icon } from "@/components/layout/icon";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LoadingState } from "@/components/shared/loading-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { apiRequest } from "@/lib/client-api";
 
-const MOCK_CUSTOMERS = [
-  { id: "cust-1", name: "Acme Corp",    email: "admin@acme.com",    subscriptions: 2, status: "active" },
-  { id: "cust-2", name: "TechStart Ltd",email: "info@techstart.io", subscriptions: 1, status: "active" },
-  { id: "cust-3", name: "GreenLeaf Inc",email: "ops@greenleaf.co",  subscriptions: 1, status: "pending"},
-];
+type Customer = { id: string; name: string; email: string; active: boolean };
 
 export default function CustomersPage() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      apiRequest<Customer[]>(`/api/customers?page=1&pageSize=100&search=${encodeURIComponent(search)}`, {
+        signal: controller.signal,
+      })
+        .then(setCustomers)
+        .catch((requestError: unknown) => {
+          if (!controller.signal.aborted) {
+            setError(requestError instanceof Error ? requestError.message : "Unable to load customers.");
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search]);
+
   return (
     <section>
       <PageHeader
@@ -24,13 +53,28 @@ export default function CustomersPage() {
             type="search"
             placeholder="Search customers…"
             aria-label="Search customers"
+            value={search}
+            onChange={(event) => {
+              setLoading(true);
+              setError(null);
+              setSearch(event.target.value);
+            }}
             className="w-full rounded-xl border border-border bg-surface py-2.5 pl-10 pr-4 text-sm text-ink placeholder-ink-faint outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors"
           />
         </div>
       </div>
 
-      {MOCK_CUSTOMERS.length === 0 ? (
-        <EmptyState title="No customers" description="Customer accounts will appear here." icon="users" />
+      {loading ? <LoadingState columns={4} /> : error ? (
+        <ErrorState message={error} onRetry={() => {
+          setLoading(true);
+          setError(null);
+          apiRequest<Customer[]>(`/api/customers?page=1&pageSize=100&search=${encodeURIComponent(search)}`)
+            .then(setCustomers)
+            .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load customers."))
+            .finally(() => setLoading(false));
+        }} />
+      ) : customers.length === 0 ? (
+        <EmptyState title="No customers" description={search ? "No customers match your search." : "Customer accounts will appear here."} icon="users" />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
           <div className="overflow-x-auto">
@@ -45,7 +89,7 @@ export default function CustomersPage() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_CUSTOMERS.map((c) => (
+                {customers.map((c) => (
                   <tr key={c.id} className="border-b border-border last:border-0 hover:bg-surface-muted/60 transition-colors group">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -58,8 +102,8 @@ export default function CustomersPage() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-ink-muted">{c.email}</td>
-                    <td className="px-5 py-4 text-ink-muted tabular">{c.subscriptions}</td>
-                    <td className="px-5 py-4"><StatusBadge status={c.status} /></td>
+                    <td className="px-5 py-4 text-ink-muted tabular">—</td>
+                    <td className="px-5 py-4"><StatusBadge status={c.active ? "active" : "inactive"} /></td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <a href={`/customers/${c.id}`} aria-label={`View ${c.name}`}

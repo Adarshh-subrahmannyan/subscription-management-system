@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/layout/icon";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,11 +29,19 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      // TODO: Replace with real sign-in call once auth API is confirmed.
-      await new Promise((r) => setTimeout(r, 1000));
-      // On success, redirect based on role from API response.
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+      if (result?.error) {
+        setError("Invalid email or password. Please try again.");
+      } else {
+        router.replace("/dashboard");
+        router.refresh();
+      }
     } catch {
-      setError("Invalid email or password. Please try again.");
+      setError("Unable to sign in right now. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

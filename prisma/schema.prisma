@@ -8,8 +8,247 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
+  id            String      @id @default(cuid())
+  email         String      @unique
+  name          String?
+  passwordHash  String?
+  role          String      @default("customer")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  customer      Customer?
+  quotations    Quotation[] @relation("QuotationCreatedBy")
+}
+
+model Customer {
+  id            String         @id @default(cuid())
+  userId        String?        @unique
+  name          String
+  email         String
+  phone         String?
+  address       String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  user          User?          @relation(fields: [userId], references: [id])
+  quotations    Quotation[]
+  subscriptions Subscription[]
+  invoices      Invoice[]
+
+  @@index([email])
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  name        String
+  type        String
+  salesPrice  Int // Integer cents
+  costPrice   Int? // Integer cents
+  notes       String?
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  variants    ProductVariant[]
+  planItems   PlanItem[]
+  quoteLines  QuotationLine[]
+  subLines    SubscriptionLine[]
+  invoiceLines InvoiceLine[]
+
+  @@index([active])
+  @@index([name])
+}
+
+model ProductVariant {
+  id           String   @id @default(cuid())
+  productId    String
+  name         String
+  priceDelta   Int // Integer cents
+  active       Boolean  @default(true)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, active])
+}
+
+model Plan {
+  id                 String         @id @default(cuid())
+  name               String
+  description        String?
+  price              Int // Integer cents
+  billingFrequency   String
+  minimumQuantity    Int            @default(1)
+  availabilityStart  DateTime?
+  availabilityEnd    DateTime?
+  autoClose          Boolean        @default(false)
+  allowEarlyClosure  Boolean        @default(false)
+  allowPause         Boolean        @default(false)
+  allowRenewal       Boolean        @default(true)
+  active              Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  items              PlanItem[]
+  quotations         Quotation[]
+  subscriptions      Subscription[]
+
+  @@index([active, billingFrequency])
+}
+
+model PlanItem {
+  id        String  @id @default(cuid())
+  planId    String
+  productId String
+  quantity  Int     @default(1)
+  plan      Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([planId, productId])
+}
+
+model Quotation {
+  id          String          @id @default(cuid())
+  number      String          @unique
+  customerId  String
+  planId      String?
+  createdById String
+  status      String          @default("draft")
+  validUntil  DateTime
+  subtotal    Int // Integer cents
+  taxTotal    Int // Integer cents
+  discountTotal Int // Integer cents
+  total       Int // Integer cents
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  customer    Customer        @relation(fields: [customerId], references: [id])
+  plan        Plan?           @relation(fields: [planId], references: [id])
+  createdBy   User            @relation("QuotationCreatedBy", fields: [createdById], references: [id])
+  lines       QuotationLine[]
+  subscription Subscription?
+
+  @@index([customerId, status])
+  @@index([validUntil])
+}
+
+model QuotationLine {
+  id          String     @id @default(cuid())
+  quotationId String
+  productId   String
+  quantity    Int
+  unitPrice   Int // Integer cents
+  taxAmount   Int // Integer cents
+  amount      Int // Integer cents
+  quotation   Quotation  @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product     Product    @relation(fields: [productId], references: [id])
+}
+
+model Subscription {
+  id             String             @id @default(cuid())
+  number         String             @unique
+  customerId     String
+  planId         String
+  quotationId    String?            @unique
+  status         String             @default("draft")
+  startDate      DateTime
+  expiryDate     DateTime?
+  nextBillingDate DateTime?
+  paymentTerms   String?
+  pausedAt       DateTime?
+  closedAt       DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  customer       Customer           @relation(fields: [customerId], references: [id])
+  plan           Plan               @relation(fields: [planId], references: [id])
+  quotation     Quotation?         @relation(fields: [quotationId], references: [id])
+  lines         SubscriptionLine[]
+  invoices      Invoice[]
+
+  @@index([customerId, status])
+  @@index([status, nextBillingDate])
+}
+
+model SubscriptionLine {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  productId      String
+  quantity       Int
+  unitPrice      Int // Integer cents
+  taxAmount      Int // Integer cents
+  amount         Int // Integer cents
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id])
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  number         String        @unique
+  customerId     String
+  subscriptionId String?
+  billingPeriod  String
+  status         String        @default("draft")
+  issuedAt       DateTime?
+  dueAt          DateTime?
+  subtotal       Int // Integer cents
+  taxTotal       Int // Integer cents
+  discountTotal  Int // Integer cents
+  total          Int // Integer cents
+  paidAmount     Int           @default(0) // Integer cents
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  lines          InvoiceLine[]
+  payments       Payment[]
+
+  @@unique([subscriptionId, billingPeriod])
+  @@index([customerId, status])
+  @@index([dueAt, status])
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  productId   String
+  description String
+  quantity    Int
+  unitPrice   Int // Integer cents
+  taxAmount   Int // Integer cents
+  amount      Int // Integer cents
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  method      String
+  amount      Int // Integer cents
+  paidAt      DateTime @default(now())
+  reference   String?
+  note        String?
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId, paidAt])
+}
+
+model TaxRule {
+  id          String   @id @default(cuid())
+  name        String
+  rate        Int // Basis points: 825 = 8.25%
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Discount {
+  id                String   @id @default(cuid())
+  name              String
+  kind              String
+  value             Int // Integer cents for fixed discounts, basis points for percentage discounts
+  minimumPurchase   Int? // Integer cents
+  minimumQuantity   Int?
+  startsAt          DateTime?
+  endsAt            DateTime?
+  usageLimit        Int?
+  usageCount        Int      @default(0)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([active, startsAt, endsAt])
 }

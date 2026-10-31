@@ -9,3 +9,11 @@ const permissions: Record<Role, readonly string[]> = {
 export function hasPermission(role: Role, permission: string) {
   return permissions[role].includes("*") || permissions[role].includes(permission);
 }
+
+export function canAccessCustomerData(
+  role: Role,
+  actorCustomerId: string | null,
+  requestedCustomerId: string,
+) {
+  return role !== "customer" || actorCustomerId === requestedCustomerId;
+}

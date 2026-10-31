@@ -2,9 +2,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createProduct, listProducts, type ProductInput } from "@/modules/products";
 import { failure, created, success, readJson } from "@/lib/api-response";
-import { forbiddenError } from "@/lib/errors";
+import { authError, forbiddenError } from "@/lib/errors";
 
 export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return failure(authError());
+  }
   const { searchParams } = new URL(request.url);
   const products = await listProducts({
     page: Number(searchParams.get("page") ?? 1),
@@ -15,6 +19,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
+  if (!session?.user) return failure(authError());
   if (session?.user.role !== "admin") {
     return failure(forbiddenError("Admin access required."));
   }

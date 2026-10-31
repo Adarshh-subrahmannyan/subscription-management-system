@@ -4,6 +4,7 @@ import {
   assertSubscriptionTransition,
   type SubscriptionStatus,
 } from "./lifecycle";
+import { validateSubscriptionStartDate } from "./subscription.validation";
 
 function subscriptionNumber() {
   return `SUB-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`;
@@ -21,8 +22,7 @@ export async function convertQuotationToSubscription(
   startDate: string,
 ) {
   assertCanManage(role);
-  const start = new Date(startDate);
-  if (Number.isNaN(start.getTime())) throw new Error("Start date must be valid.");
+  const start = validateSubscriptionStartDate(startDate);
 
   return prisma.$transaction(async (transaction) => {
     const quotation = await transaction.quotation.findUnique({

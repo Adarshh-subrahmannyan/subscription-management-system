@@ -1,31 +1,31 @@
 import { getServerSession } from "next-auth";
-import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { getPlan, updatePlan, type PlanInput } from "@/modules/plans";
+import { failure, success, readJson } from "@/lib/api-response";
+import { authError, forbiddenError } from "@/lib/errors";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, context: RouteContext) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return failure(authError());
   const { id } = await context.params;
   const plan = await getPlan(id);
-  if (!plan) return NextResponse.json({ error: "Plan not found." }, { status: 404 });
-  return NextResponse.json(plan);
+  if (!plan) return failure(new Error("Plan not found."));
+  return success(plan);
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
   const session = await getServerSession(authOptions);
+  if (!session?.user) return failure(authError());
   if (session?.user.role !== "admin") {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+    return failure(forbiddenError("Admin access required."));
   }
 
   try {
     const { id } = await context.params;
-    return NextResponse.json(
-      await updatePlan("admin", id, (await request.json()) as PlanInput),
-    );
+    return success(await updatePlan("admin", id, await readJson<PlanInput>(request)));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to update plan.";
-    const status = message.includes("not found") ? 404 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return failure(error, "Unable to update plan.");
   }
 }

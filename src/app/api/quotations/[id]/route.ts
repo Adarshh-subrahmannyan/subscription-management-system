@@ -2,12 +2,13 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { getQuotation } from "@/modules/quotations";
+import { authError, forbiddenError } from "@/lib/errors";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, context: RouteContext) {
   const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: authError().message }, { status: 401 });
 
   const { id } = await context.params;
   const quotation = await getQuotation(session.user.role, session.user.customerId, id);
@@ -17,8 +18,11 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user.role !== "admin" && session.user.role !== "staff")) {
-    return NextResponse.json({ error: "Admin or staff access required." }, { status: 403 });
+  if (!session?.user) {
+    return NextResponse.json({ error: authError().message }, { status: 401 });
+  }
+  if (session.user.role !== "admin" && session.user.role !== "staff") {
+    return NextResponse.json({ error: forbiddenError("Admin or staff access required.").message }, { status: 403 });
   }
 
   const { id } = await context.params;

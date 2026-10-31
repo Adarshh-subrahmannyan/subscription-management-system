@@ -1,62 +1,26 @@
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/lib/permissions";
-
-export type ProductVariantInput = {
-  name: string;
-  priceDelta: number;
-  active?: boolean;
-};
-
-export type ProductInput = {
-  name: string;
-  type: string;
-  salesPrice: number;
-  costPrice?: number | null;
-  notes?: string | null;
-  active?: boolean;
-  variants?: ProductVariantInput[];
-};
+import { validateProduct, type ProductInput } from "./product.validation";
 
 function assertAdmin(role: Role) {
   if (role !== "admin") throw new Error("Only admins can modify products.");
 }
 
-function validateProduct(input: ProductInput) {
-  if (!input.name.trim() || !input.type.trim()) {
-    throw new Error("Product name and type are required.");
-  }
-  if (!Number.isInteger(input.salesPrice) || input.salesPrice < 0) {
-    throw new Error("Sales price must be a non-negative integer in cents.");
-  }
-  if (
-    input.costPrice !== undefined &&
-    input.costPrice !== null &&
-    (!Number.isInteger(input.costPrice) || input.costPrice < 0)
-  ) {
-    throw new Error("Cost price must be a non-negative integer in cents.");
-  }
-  for (const variant of input.variants ?? []) {
-    if (!variant.name.trim() || !Number.isInteger(variant.priceDelta)) {
-      throw new Error("Each variant needs a name and integer price adjustment.");
-    }
-  }
-}
-
 export async function createProduct(role: Role, input: ProductInput) {
   assertAdmin(role);
-  validateProduct(input);
+  const validated = validateProduct(input);
 
   return prisma.product.create({
     data: {
-      name: input.name.trim(),
-      type: input.type.trim(),
-      salesPrice: input.salesPrice,
-      costPrice: input.costPrice,
-      notes: input.notes?.trim() || null,
-      active: input.active ?? true,
+      name: validated.name,
+      type: validated.type,
+      salesPrice: validated.salesPrice,
+      costPrice: validated.costPrice,
+      notes: validated.notes,
+      active: validated.active,
       variants: {
-        create: (input.variants ?? []).map((variant) => ({
-          name: variant.name.trim(),
+        create: validated.variants.map((variant) => ({
+          name: variant.name,
           priceDelta: variant.priceDelta,
           active: variant.active ?? true,
         })),
@@ -72,22 +36,22 @@ export async function updateProduct(
   input: ProductInput,
 ) {
   assertAdmin(role);
-  validateProduct(input);
+  const validated = validateProduct(input);
 
   return prisma.$transaction(async (transaction) => {
     await transaction.productVariant.deleteMany({ where: { productId: id } });
     return transaction.product.update({
       where: { id },
       data: {
-        name: input.name.trim(),
-        type: input.type.trim(),
-        salesPrice: input.salesPrice,
-        costPrice: input.costPrice,
-        notes: input.notes?.trim() || null,
-        active: input.active ?? true,
+        name: validated.name,
+        type: validated.type,
+        salesPrice: validated.salesPrice,
+        costPrice: validated.costPrice,
+        notes: validated.notes,
+        active: validated.active,
         variants: {
-          create: (input.variants ?? []).map((variant) => ({
-            name: variant.name.trim(),
+          create: validated.variants.map((variant) => ({
+            name: variant.name,
             priceDelta: variant.priceDelta,
             active: variant.active ?? true,
           })),

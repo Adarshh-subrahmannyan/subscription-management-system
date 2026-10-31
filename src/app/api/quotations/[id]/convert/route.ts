@@ -2,13 +2,17 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { convertQuotationToSubscription } from "@/modules/subscriptions";
+import { authError, forbiddenError } from "@/lib/errors";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
   const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user.role !== "admin" && session.user.role !== "staff")) {
-    return NextResponse.json({ error: "Admin or staff access required." }, { status: 403 });
+  if (!session?.user) {
+    return NextResponse.json({ error: authError().message }, { status: 401 });
+  }
+  if (session.user.role !== "admin" && session.user.role !== "staff") {
+    return NextResponse.json({ error: forbiddenError("Admin or staff access required.").message }, { status: 403 });
   }
 
   let body: { startDate?: unknown };

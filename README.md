@@ -17,6 +17,15 @@ npm run dev
 The application routes are organized under `src/app`, reusable UI lives under
 `src/components`, and domain logic is grouped under `src/modules`.
 
+### Password reset demo
+
+`POST /api/auth/forgot-password` always returns the same generic message so
+account existence cannot be discovered. When running outside production, the
+response also includes `demoResetToken` and `expiresAt`; use that token with
+`POST /api/auth/reset-password` and a new password. Production responses never
+return reset tokens. Configure `AUTH_RESET_TOKEN_TTL_MINUTES` to change the
+default 60-minute expiry.
+
 ## Database migrations
 
 Create and apply a local migration after updating the Prisma schema:

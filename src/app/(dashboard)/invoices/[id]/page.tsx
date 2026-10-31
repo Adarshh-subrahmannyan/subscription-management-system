@@ -172,27 +172,38 @@ export default function InvoiceDetailPage() {
   const balanceDue = Math.max(0, invoice.total - invoice.paidAmount);
 
   return (
-    <section>
+    <section className="invoice-detail">
       <PageHeader
         title={invoice.number}
         description={`Issued to ${invoice.customer.name}`}
         badge={invoice.status.toUpperCase()}
-        actions={
-          canManage && balanceDue > 0 ? (
+        actions={(
+          <div className="flex flex-wrap justify-end gap-2 print-hidden">
             <button
-              onClick={() => setShowPaymentForm(true)}
-              className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-brand hover:bg-brand-600 transition-colors"
+              type="button"
+              onClick={() => window.print()}
+              className="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-ink hover:bg-surface-muted transition-colors"
             >
-              <Icon name="card" className="h-4 w-4" />
-              Record payment
+              <Icon name="download" className="h-4 w-4" />
+              Print / save PDF
             </button>
-          ) : undefined
-        }
+            {canManage && balanceDue > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowPaymentForm(true)}
+                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-brand hover:bg-brand-600 transition-colors"
+              >
+                <Icon name="card" className="h-4 w-4" />
+                Record payment
+              </button>
+            )}
+          </div>
+        )}
       />
 
       {/* Record Payment Modal / Section */}
       {showPaymentForm && (
-        <div className="mb-6 card p-6 border-brand/30 bg-brand-light/30">
+        <div className="mb-6 card p-6 border-brand/30 bg-brand-light/30 print-hidden">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-ink">Record payment for {invoice.number}</h3>
             <button
@@ -239,7 +250,7 @@ export default function InvoiceDetailPage() {
               </label>
               <input
                 type="text"
-                placeholder="e.g. UTR12345678 or TXN-001"
+                placeholder={payMethod === "upi" ? "e.g. UPI transaction ID" : "e.g. UTR12345678 or TXN-001"}
                 value={payRef}
                 onChange={(e) => setPayRef(e.target.value)}
                 className="w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink outline-none focus:border-brand"

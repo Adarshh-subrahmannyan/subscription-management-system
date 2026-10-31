@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/layout/icon";
@@ -30,8 +31,11 @@ export default function RegisterPage() {
 
     if (!form.name.trim()) { setError("Full name is required."); return; }
     if (!form.email)        { setError("Email is required."); return; }
-    if (form.password.length < 8) {
-      setError("Password must be at least 8 characters."); return;
+    if (form.password.length <= 8) {
+      setError("Password must be longer than 8 characters."); return;
+    }
+    if (!/[A-Z]/.test(form.password) || !/[a-z]/.test(form.password) || !/[^A-Za-z0-9]/.test(form.password)) {
+      setError("Password must include uppercase, lowercase, and a special character."); return;
     }
     if (form.password !== form.confirm) {
       setError("Passwords do not match."); return;
@@ -39,17 +43,30 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      await apiRequest("/api/auth/register", {
+      const response = await fetch("/api/auth/register", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
+          name: form.name,
+          email: form.email,
           password: form.password,
         }),
       });
-      router.replace("/login?registered=1");
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Registration failed. Please try again.");
+      const payload = (await response.json()) as {
+        data?: unknown;
+        error?: { message?: string } | string;
+      };
+      if (!response.ok) {
+        const message =
+          typeof payload.error === "string"
+            ? payload.error
+            : payload.error?.message ?? "Registration failed. Please try again.";
+        setError(message);
+        return;
+      }
+      router.push("/login?registered=1");
+    } catch {
+      setError("Registration failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

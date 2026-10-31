@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -34,12 +36,12 @@ export default function LoginPage() {
         password,
         redirect: false,
       });
-      if (result?.error) {
+      if (!result || result.error) {
         setError("Invalid email or password. Please try again.");
-      } else {
-        router.replace("/dashboard");
-        router.refresh();
+        return;
       }
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       setError("Unable to sign in right now. Please try again.");
     } finally {

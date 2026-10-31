@@ -4,6 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+
+  .invoice-detail {
+    padding: 0 !important;
+  }
+
+  .invoice-detail .card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}
+
 :root {
   color-scheme: light;
   font-family: 'Inter', 'Manrope', system-ui, sans-serif;

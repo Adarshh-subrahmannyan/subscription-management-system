@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { APP_NAME } from "@/lib/constants";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Subscript — Subscription Management",
-    template: "%s | Subscript",
+    default: `${APP_NAME} — Subscription Management`,
+    template: `%s | ${APP_NAME}`,
   },
   description:
     "Manage products, subscription plans, customers, invoices, and payments — all in one place.",

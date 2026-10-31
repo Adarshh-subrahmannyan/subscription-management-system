@@ -1,1 +1,1 @@
-export const APP_NAME = "Subscription Management System";
+export const APP_NAME = "Subscribo";

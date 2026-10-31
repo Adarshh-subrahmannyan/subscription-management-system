@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createCustomer, listCustomers, type CustomerInput } from "@/modules/customers";
+import { authError, forbiddenError } from "@/lib/errors";
+import { created, failure, readJson, success } from "@/lib/api-response";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    return failure(authError());
   }
   const searchParams = new URL(request.url).searchParams;
-  return NextResponse.json(
+  return success(
     await listCustomers(session.user.role, session.user.customerId, {
       page: Number(searchParams.get("page") ?? 1),
       pageSize: Number(searchParams.get("pageSize") ?? 20),
@@ -21,16 +22,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    return failure(authError());
   }
   try {
-    return NextResponse.json(
-      await createCustomer(session.user.role, (await request.json()) as CustomerInput),
-      { status: 201 },
-    );
+    return created(await createCustomer(session.user.role, await readJson<CustomerInput>(request)));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to create customer.";
-    const status = message.includes("required") ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return failure(
+      error instanceof Error && error.message === "Admin or staff access required."
+        ? forbiddenError(error.message)
+        : error,
+      "Unable to create customer.",
+    );
   }
 }

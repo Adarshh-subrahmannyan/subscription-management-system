@@ -17,6 +17,11 @@ npm run dev
 The application routes are organized under `src/app`, reusable UI lives under
 `src/components`, and domain logic is grouped under `src/modules`.
 
+API handlers use [`src/lib/api-response.ts`](./src/lib/api-response.ts) for
+consistent `{ data }` success responses and structured `{ error: { code,
+message } }` failures. Shared application errors are defined in
+[`src/lib/errors.ts`](./src/lib/errors.ts).
+
 ### Password reset demo
 
 `POST /api/auth/forgot-password` always returns the same generic message so

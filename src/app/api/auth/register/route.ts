@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { registerCustomer } from "@/modules/auth/auth.service";
+import { created, failure, readJson } from "@/lib/api-response";
 
 type RegistrationBody = {
   email?: unknown;
@@ -11,9 +11,9 @@ export async function POST(request: Request) {
   let body: RegistrationBody;
 
   try {
-    body = (await request.json()) as RegistrationBody;
+    body = await readJson<RegistrationBody>(request);
   } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return failure(new Error("Request body must be valid JSON."));
   }
 
   if (
@@ -23,10 +23,7 @@ export async function POST(request: Request) {
     !body.email.trim() ||
     !body.name.trim()
   ) {
-    return NextResponse.json(
-      { error: "Email, name, and password are required." },
-      { status: 400 },
-    );
+    return failure(new Error("Email, name, and password are required."));
   }
 
   try {
@@ -36,10 +33,8 @@ export async function POST(request: Request) {
       password: body.password,
     });
 
-    return NextResponse.json({ user }, { status: 201 });
+    return created(user);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Registration failed.";
-    const status = message.includes("already exists") ? 409 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return failure(error, "Registration failed.");
   }
 }

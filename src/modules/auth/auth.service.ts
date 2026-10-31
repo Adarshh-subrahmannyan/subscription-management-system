@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { hashPassword, validatePassword } from "./password";
+import {
+  createPasswordResetToken,
+  hashPassword,
+  hashPasswordResetToken,
+  validatePassword,
+} from "./password";
 
 export type UserRole = "admin" | "staff" | "customer";
 
@@ -54,4 +59,73 @@ export async function createStaffAccount(
     },
     select: { id: true, email: true, name: true, role: true },
   });
+}
+
+const DEFAULT_RESET_TOKEN_TTL_MINUTES = 60;
+
+function resetTokenTtlMinutes() {
+  const configured = Number(process.env.AUTH_RESET_TOKEN_TTL_MINUTES);
+  return Number.isInteger(configured) && configured > 0
+    ? configured
+    : DEFAULT_RESET_TOKEN_TTL_MINUTES;
+}
+
+export async function requestPasswordReset(emailInput: string) {
+  const email = emailInput.trim().toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  // Keep the result indistinguishable for known and unknown addresses.
+  if (!user || !user.passwordHash) return null;
+
+  const token = createPasswordResetToken();
+  const expiresAt = new Date(Date.now() + resetTokenTtlMinutes() * 60_000);
+
+  await prisma.$transaction([
+    prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    }),
+    prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashPasswordResetToken(token),
+        expiresAt,
+      },
+    }),
+  ]);
+
+  return { token, expiresAt };
+}
+
+export async function resetPassword(token: string, password: string) {
+  if (!token.trim()) throw new Error("Reset token is required.");
+  const passwordError = validatePassword(password);
+  if (passwordError) throw new Error(passwordError);
+
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash: hashPasswordResetToken(token) },
+  });
+  if (!resetToken || resetToken.usedAt || resetToken.expiresAt <= new Date()) {
+    throw new Error("Reset token is invalid or expired.");
+  }
+
+  const passwordHash = await hashPassword(password);
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { usedAt: new Date() },
+    }),
+    prisma.passwordResetToken.updateMany({
+      where: {
+        userId: resetToken.userId,
+        usedAt: null,
+        id: { not: resetToken.id },
+      },
+      data: { usedAt: new Date() },
+    }),
+  ]);
 }

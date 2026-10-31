@@ -2,6 +2,11 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
 import { prisma } from "./prisma";
 import { verifyPassword } from "@/modules/auth/password";
+import type { Role } from "./permissions";
+
+function isRole(value: string): value is Role {
+  return value === "admin" || value === "staff" || value === "customer";
+}
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -27,6 +32,8 @@ export const authOptions: NextAuthOptions = {
         if (!user?.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
           return null;
         }
+
+        if (!isRole(user.role)) return null;
 
         return {
           id: user.id,

@@ -1,2 +1,11 @@
 import { NextResponse } from "next/server";
-export async function GET() { return NextResponse.json([]); }
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { listSubscriptions } from "@/modules/subscriptions";
+
+export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const page = Number(new URL(request.url).searchParams.get("page") ?? 1);
+  return NextResponse.json(await listSubscriptions(session.user.role, session.user.customerId, page));
+}

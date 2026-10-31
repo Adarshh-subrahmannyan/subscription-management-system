@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import NextAuth from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-export async function GET() { return NextResponse.json({ message: "Auth endpoint" }); }
-export async function POST() { return NextResponse.json({ message: "Auth endpoint" }); }
+const handler = NextAuth(authOptions);
+
+export { handler as GET, handler as POST };

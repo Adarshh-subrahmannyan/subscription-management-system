@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" role="img" aria-label="Subscription Management System">
+  <rect width="48" height="48" rx="8" fill="#2563eb"/>
+  <path d="M14 16h20v5H14zm0 9h20v5H14z" fill="#fff"/>
+  <text x="60" y="31" font-family="Arial, sans-serif" font-size="18" fill="#172033">Subscription Management</text>
+</svg>

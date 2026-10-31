@@ -1,6 +1,7 @@
 import {
   createPayment,
   updatePaymentStatus,
+  simulatePayment,
 } from "../../src/modules/payments/payment.service";
 
 const payment = createPayment(
@@ -23,4 +24,18 @@ if (updatedPayment.status !== "completed") {
   throw new Error("Payment status update failed.");
 }
 
-console.log("Payment service test passed!");
+// Test simulated successful payment
+const successfulPayment = simulatePayment(payment, "success");
+
+if (successfulPayment.status !== "completed") {
+  throw new Error("Successful payment simulation failed.");
+}
+
+// Test simulated failed payment
+const failedPayment = simulatePayment(payment, "failure");
+
+if (failedPayment.status !== "failed") {
+  throw new Error("Failed payment simulation failed.");
+}
+
+console.log("Payment service tests passed!");

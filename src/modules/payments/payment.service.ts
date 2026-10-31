@@ -41,3 +41,32 @@ export function updatePaymentStatus(
     status,
   };
 }
+
+export function simulatePayment(
+  payment: Payment,
+  outcome: "success" | "failure"
+): Payment {
+  if (payment.status !== "pending") {
+    throw new Error("Only pending payments can be processed.");
+  }
+
+  const newStatus: PaymentStatus =
+    outcome === "success" ? "completed" : "failed";
+
+  return updatePaymentStatus(payment, newStatus);
+}
+
+const payments = new Map<string, Payment>();
+
+export function savePayment(payment: Payment): Payment {
+  payments.set(payment.id, payment);
+  return payment;
+}
+
+export function getPayment(paymentId: string): Payment | undefined {
+  return payments.get(paymentId);
+}
+
+export function getAllPayments(): Payment[] {
+  return Array.from(payments.values());
+}

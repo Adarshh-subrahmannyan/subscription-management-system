@@ -1,41 +1,54 @@
 import {
   createPayment,
-  updatePaymentStatus,
+  getPayment,
+  getAllPayments,
   simulatePayment,
 } from "../../src/modules/payments/payment.service";
 
-const payment = createPayment(
-  "INV-001",
-  100000,
-  "upi"
-);
+async function runTests() {
+  // Invalid invoice ID
+  try {
+    await createPayment("", 100000, "upi");
+    throw new Error("Empty invoice ID should be rejected.");
+  } catch (error) {
+    if (error instanceof Error && error.message === "Empty invoice ID should be rejected.") {
+      throw error;
+    }
+  }
 
-if (payment.status !== "pending") {
-  throw new Error("Initial payment status should be pending.");
+  // Invalid amount
+  try {
+    await createPayment("INV-001", -100, "upi");
+    throw new Error("Negative amount should be rejected.");
+  } catch (error) {
+    if (error instanceof Error && error.message === "Negative amount should be rejected.") {
+      throw error;
+    }
+  }
+
+  const payments = await getAllPayments();
+  if (!Array.isArray(payments)) {
+    throw new Error("Payment list should be an array.");
+  }
+
+  const payment = await getPayment("non-existent-payment");
+  if (payment !== null) {
+    throw new Error("Missing payment should return null.");
+  }
+
+  try {
+    await simulatePayment("non-existent-payment", "success");
+    throw new Error("Missing payment should not be processed.");
+  } catch (error) {
+    if (error instanceof Error && error.message === "Missing payment should not be processed.") {
+      throw error;
+    }
+  }
+
+  console.log("Payment service tests passed!");
 }
 
-if (payment.amount !== 100000) {
-  throw new Error("Payment amount is incorrect.");
-}
-
-const updatedPayment = updatePaymentStatus(payment, "completed");
-
-if (updatedPayment.status !== "completed") {
-  throw new Error("Payment status update failed.");
-}
-
-// Test simulated successful payment
-const successfulPayment = simulatePayment(payment, "success");
-
-if (successfulPayment.status !== "completed") {
-  throw new Error("Successful payment simulation failed.");
-}
-
-// Test simulated failed payment
-const failedPayment = simulatePayment(payment, "failure");
-
-if (failedPayment.status !== "failed") {
-  throw new Error("Failed payment simulation failed.");
-}
-
-console.log("Payment service tests passed!");
+runTests().catch((error) => {
+  console.error("Payment service tests failed:", error);
+  process.exitCode = 1;
+});

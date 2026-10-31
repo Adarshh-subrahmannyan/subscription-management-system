@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   createInvoice,
   getAllInvoices,
+  markInvoicePaid,
 } from "@/modules/invoices/invoice.service";
 
 export async function GET() {
@@ -25,6 +26,26 @@ export async function POST(request: Request) {
           error instanceof Error
             ? error.message
             : "Unable to create invoice",
+      },
+      { status: 400 }
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+
+    const invoice = markInvoicePaid(body.invoiceId);
+
+    return NextResponse.json(invoice);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to update invoice",
       },
       { status: 400 }
     );

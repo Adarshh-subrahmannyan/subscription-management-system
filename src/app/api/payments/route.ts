@@ -7,8 +7,6 @@ import {
   simulatePayment,
 } from "@/modules/payments/payment.service";
 
-import { markInvoicePaid } from "@/modules/invoices/invoice.service";
-
 // Get all payments
 export async function GET() {
   return NextResponse.json(getAllPayments());
@@ -45,7 +43,6 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-
     const payment = getPayment(body.paymentId);
 
     if (!payment) {
@@ -55,19 +52,29 @@ export async function PATCH(request: Request) {
       );
     }
 
-   const updatedPayment = simulatePayment(
-  payment,
-  body.outcome
-);
+    const updatedPayment = simulatePayment(payment, body.outcome);
+    savePayment(updatedPayment);
 
-savePayment(updatedPayment);
+    if (updatedPayment.status === "completed") {
+      const invoiceResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/invoices`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            invoiceId: updatedPayment.invoiceId,
+          }),
+        }
+      );
 
-// Update invoice when payment succeeds
-if (updatedPayment.status === "completed") {
-  markInvoicePaid(updatedPayment.invoiceId);
-}
+      if (!invoiceResponse.ok) {
+        throw new Error("Payment completed, but invoice update failed.");
+      }
+    }
 
-return NextResponse.json(updatedPayment);
+    return NextResponse.json(updatedPayment);
   } catch (error) {
     return NextResponse.json(
       {

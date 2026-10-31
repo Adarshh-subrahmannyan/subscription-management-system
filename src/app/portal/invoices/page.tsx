@@ -3,19 +3,6 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ErrorState } from "@/components/shared/error-state";
-import { LoadingState } from "@/components/shared/loading-state";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { apiRequest, formatCurrency, formatDate } from "@/lib/client-api";
-
-type Invoice = {
-  id: string;
-  number: string;
-  status: string;
-  total: number;
-  dueAt: string | null;
-  createdAt: string;
-};
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("en-IN", {

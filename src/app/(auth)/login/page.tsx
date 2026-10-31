@@ -4,8 +4,6 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Icon } from "@/components/layout/icon";
 
 export default function LoginPage() {
@@ -43,7 +41,7 @@ export default function LoginPage() {
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("Unable to sign in right now. Please try again.");
+      setError("Invalid email or password. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

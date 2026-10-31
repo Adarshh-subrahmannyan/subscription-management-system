@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Icon } from "@/components/layout/icon";
-import { apiRequest } from "@/lib/client-api";
 
 export default function RegisterPage() {
   const router = useRouter();

@@ -6,9 +6,6 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Icon } from "@/components/layout/icon";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
-import { LoadingState } from "@/components/shared/loading-state";
-import { ErrorState } from "@/components/shared/error-state";
-import { apiRequest, formatCurrency, formatDate } from "@/lib/client-api";
 
 type Subscription = {
   id: string;

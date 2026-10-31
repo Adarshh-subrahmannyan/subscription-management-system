@@ -5,19 +5,6 @@ import { useSession } from "next-auth/react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Icon } from "@/components/layout/icon";
 import { EmptyState } from "@/components/shared/empty-state";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { LoadingState } from "@/components/shared/loading-state";
-import { ErrorState } from "@/components/shared/error-state";
-import { apiRequest, formatCurrency, formatDate } from "@/lib/client-api";
-
-type Payment = {
-  id: string;
-  method: string;
-  amount: number;
-  paidAt: string;
-  note: string | null;
-  invoice: { number: string; status: string };
-};
 
 type Payment = {
   id: string;

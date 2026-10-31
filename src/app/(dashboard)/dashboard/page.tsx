@@ -4,9 +4,6 @@ import { getDashboardStats } from "@/modules/analytics";
 import { Icon } from "@/components/layout/icon";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { ErrorState } from "@/components/shared/error-state";
-import { CardLoadingState } from "@/components/shared/loading-state";
-import { apiRequest, formatCurrency } from "@/lib/client-api";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(cents / 100);
@@ -79,20 +76,15 @@ export default async function DashboardPage() {
       <PageHeader
         title="Dashboard"
         description="Your subscription business at a glance."
-        badge={analytics ? "Live" : "Loading"}
+        badge="Live"
       />
 
       {/* KPI grid */}
-      {error ? <ErrorState message={error} onRetry={() => {
-        setError(null);
-        apiRequest<Analytics>("/api/analytics")
-          .then(setAnalytics)
-          .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Unable to load dashboard analytics."));
-      }} /> : !analytics ? <CardLoadingState cards={6} /> : <div
+      <div
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
         aria-label="Key performance indicators"
       >
-        {cards.map((card) => (
+        {KPI_CARDS.map((card) => (
           <StatCard
             key={card.id}
             title={card.title}
@@ -102,7 +94,7 @@ export default async function DashboardPage() {
             icon={card.icon}
           />
         ))}
-      </div>}
+      </div>
 
       {/* Recent activity links */}
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">

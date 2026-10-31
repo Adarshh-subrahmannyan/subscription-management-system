@@ -6,9 +6,6 @@ import { useSession } from "next-auth/react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Icon } from "@/components/layout/icon";
 import { EmptyState } from "@/components/shared/empty-state";
-import { LoadingState } from "@/components/shared/loading-state";
-import { ErrorState } from "@/components/shared/error-state";
-import { apiRequest, formatCurrency } from "@/lib/client-api";
 
 type Product = {
   id: string;

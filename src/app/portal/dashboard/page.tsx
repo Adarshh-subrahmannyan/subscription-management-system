@@ -54,6 +54,7 @@ export default async function PortalDashboardPage() {
 
   return (
     <section>
+      {/* Greeting header */}
       <div className="mb-6">
         <p className="text-xs text-ink-muted font-medium">Customer Portal</p>
         <h1 className="text-xl font-bold text-ink mt-0.5">{customerName}</h1>
@@ -99,29 +100,9 @@ export default async function PortalDashboardPage() {
         </div>
       )}
 
-          <div className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-bold text-ink">Recent subscriptions</h2>
-              <a href="/portal/subscriptions" className="text-xs font-semibold text-brand">View all</a>
-            </div>
-            {subscriptions.length === 0 ? (
-              <div className="card"><EmptyState title="No subscriptions" icon="repeat" /></div>
-            ) : <div className="space-y-3">
-              {subscriptions.map((subscription) => (
-                <article key={subscription.id} className="card flex items-center justify-between gap-3 p-4">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{subscription.plan.name}</p>
-                    <p className="mt-1 text-xs text-ink-muted">Next billing {formatDate(subscription.nextBillingDate)}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-ink">{formatCurrency(subscription.plan.price)}</p>
-                    <StatusBadge status={subscription.status} />
-                  </div>
-                </article>
-              ))}
-            </div>}
-          </div>
-
+      {/* Active subscriptions */}
+      <div className="mb-6">
+        <div className="flex items-baseline justify-between mb-3">
           <div>
             <p className="text-xs text-ink-muted font-medium">Your</p>
             <p className="text-base font-bold text-ink leading-tight">Active Subscriptions</p>

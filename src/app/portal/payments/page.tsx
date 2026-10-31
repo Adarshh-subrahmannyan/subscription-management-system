@@ -2,18 +2,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ErrorState } from "@/components/shared/error-state";
-import { LoadingState } from "@/components/shared/loading-state";
-import { apiRequest, formatCurrency, formatDate } from "@/lib/client-api";
-
-type Payment = {
-  id: string;
-  method: string;
-  amount: number;
-  paidAt: string;
-  note: string | null;
-  invoice: { number: string };
-};
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("en-IN", {

@@ -1,20 +1,13 @@
-export type PaymentStatus = "pending" | "completed" | "failed" | "refunded";
+import { prisma } from "@/lib/prisma";
 
-export interface Payment {
-  id: string;
-  invoiceId: string;
-  amount: number;
-  method: "card" | "upi" | "bank_transfer";
-  status: PaymentStatus;
-  createdAt: Date;
-}
+export type PaymentMethod = "card" | "upi" | "bank_transfer";
 
-export function createPayment(
+export async function createPayment(
   invoiceId: string,
   amount: number,
-  method: Payment["method"]
-): Payment {
-  if (!invoiceId.trim()) {
+  method: PaymentMethod
+) {
+  if (!invoiceId?.trim()) {
     throw new Error("Invoice ID is required.");
   }
 
@@ -22,51 +15,96 @@ export function createPayment(
     throw new Error("Payment amount must be a positive integer.");
   }
 
-  return {
-    id: crypto.randomUUID(),
-    invoiceId,
-    amount,
-    method,
-    status: "pending",
-    createdAt: new Date(),
-  };
-}
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+  });
 
-export function updatePaymentStatus(
-  payment: Payment,
-  status: PaymentStatus
-): Payment {
-  return {
-    ...payment,
-    status,
-  };
-}
-
-export function simulatePayment(
-  payment: Payment,
-  outcome: "success" | "failure"
-): Payment {
-  if (payment.status !== "pending") {
-    throw new Error("Only pending payments can be processed.");
+  if (!invoice) {
+    throw new Error("Invoice not found.");
   }
 
-  const newStatus: PaymentStatus =
-    outcome === "success" ? "completed" : "failed";
+  if (invoice.status === "paid") {
+    throw new Error("Invoice is already paid.");
+  }
 
-  return updatePaymentStatus(payment, newStatus);
+  return prisma.payment.create({
+    data: {
+      invoiceId,
+      amount,
+      method,
+      note: "Payment created; awaiting confirmation",
+    },
+  });
 }
 
-const payments = new Map<string, Payment>();
-
-export function savePayment(payment: Payment): Payment {
-  payments.set(payment.id, payment);
-  return payment;
+export async function getAllPayments() {
+  return prisma.payment.findMany({
+    include: { invoice: true },
+    orderBy: { paidAt: "desc" },
+  });
 }
 
-export function getPayment(paymentId: string): Payment | undefined {
-  return payments.get(paymentId);
+export async function getPayment(paymentId: string) {
+  return prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: { invoice: true },
+  });
 }
 
-export function getAllPayments(): Payment[] {
-  return Array.from(payments.values());
+export async function simulatePayment(
+  paymentId: string,
+  outcome: "success" | "failure"
+) {
+  return prisma.$transaction(async (tx) => {
+    const payment = await tx.payment.findUnique({
+      where: { id: paymentId },
+    });
+
+    if (!payment) {
+      throw new Error("Payment not found.");
+    }
+
+    if (payment.note !== "Payment created; awaiting confirmation") {
+      throw new Error("Only pending payments can be processed.");
+    }
+
+    if (outcome === "failure") {
+      return tx.payment.update({
+        where: { id: paymentId },
+        data: { note: "Payment failed" },
+      });
+    }
+
+    const invoice = await tx.invoice.findUnique({
+      where: { id: payment.invoiceId },
+    });
+
+    if (!invoice) {
+      throw new Error("Invoice not found.");
+    }
+
+    const newPaidAmount = invoice.paidAmount + payment.amount;
+
+    if (newPaidAmount > invoice.total) {
+      throw new Error("Payment exceeds the outstanding invoice amount.");
+    }
+
+    const updatedPayment = await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        paidAt: new Date(),
+        note: "Payment completed",
+      },
+    });
+
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        paidAmount: newPaidAmount,
+        status: newPaidAmount >= invoice.total ? "paid" : "partial",
+      },
+    });
+
+    return updatedPayment;
+  });
 }
